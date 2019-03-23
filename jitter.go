@@ -8,7 +8,7 @@ import (
 )
 
 // Statistics represents the jitter test results with corrected and uncorrected deviations
-type Statistics struct {
+type JitterStatistics struct {
 	Start time.Time
 	End   time.Time
 
@@ -29,12 +29,16 @@ type Jitterer struct {
 	Host string
 	// blockSampleSize represents the number of measurements that will result in 1 jitter calculation
 	blockSampleSize int
-	// OnFinish callback function to receive results of test
-	OnFinish func(stats *Statistics)
+	// pingerStatistics represents results from ping
+	pingerStatistics *ping.Statistics
 	// pinger used to execute consecutive ping requests
 	pinger           *ping.Pinger
 	pingerPrivileged bool
 	pingerTimeout    time.Duration
+	// startTime starting time of tests
+	startTime time.Time
+	// endTime ending time of tests
+	endTime time.Time
 }
 
 // NewJitterer returns a new Jitterer for the host specified
@@ -62,13 +66,15 @@ func (j *Jitterer) Run() {
 	j.pinger.Timeout = j.pingerTimeout
 
 	j.pinger.OnRecv = nil
-	j.pinger.OnFinish = func(stats *ping.Statistics) {
-		endTime := time.Now()
-		js := j.generateStatistics(stats, startTime, endTime)
-		j.OnFinish(js)
-	}
+	j.pinger.OnFinish = nil
 
 	j.pinger.Run()
+	endTime := time.Now()
+
+	j.pingerStatistics = j.pinger.Statistics()
+
+	j.startTime = startTime
+	j.endTime = endTime
 }
 
 // SetBlockSampleSize controls the number of test in the sample
@@ -86,19 +92,23 @@ func (j *Jitterer) SetPingerTimeout(timeout time.Duration) {
 	j.pingerTimeout = timeout
 }
 
-// generateStatistics calculates jitter
-func (j *Jitterer) generateStatistics(pingStats *ping.Statistics, startedAt time.Time, endedAt time.Time) *Statistics {
-	usd := time.Duration(calculateUncorrectedDeviation(pingStats.Rtts))
-	csd := time.Duration(calculateCorrectedDeviation(pingStats.Rtts))
-	sd := time.Duration(calculateSquaredDeviation(pingStats.Rtts))
-	rng := calculateRange(pingStats.Rtts)
+func (j *Jitterer) Statistics() *JitterStatistics {
+	return j.generateStatistics()
+}
 
-	return &Statistics{
+// generateStatistics calculates jitter
+func (j *Jitterer) generateStatistics() *JitterStatistics {
+	usd := time.Duration(calculateUncorrectedDeviation(j.pingerStatistics.Rtts))
+	csd := time.Duration(calculateCorrectedDeviation(j.pingerStatistics.Rtts))
+	sd := time.Duration(calculateSquaredDeviation(j.pingerStatistics.Rtts))
+	rng := calculateRange(j.pingerStatistics.Rtts)
+
+	return &JitterStatistics{
 		Host:             j.Host,
-		Start:            startedAt,
-		End:              endedAt,
-		PingStatistics:   pingStats,
-		RTTS:             pingStats.Rtts,
+		Start:            j.startTime,
+		End:              j.endTime,
+		PingStatistics:   j.pingerStatistics,
+		RTTS:             j.pingerStatistics.Rtts,
 		UncorrectedSD:    time.Duration(usd),
 		CorrectedSD:      time.Duration(csd),
 		SquaredDeviation: time.Duration(sd),
@@ -136,6 +146,9 @@ func calculateSquaredDeviation(values []time.Duration) float64 {
 
 // calculateUncorrectedDeviation calculates standard deviation without correction
 func calculateUncorrectedDeviation(values []time.Duration) float64 {
+	if len(values) == 0 {
+		return 0.0
+	}
 	sd := calculateSquaredDeviation(values)
 	return math.Sqrt(sd / float64(len(values)))
 }
