@@ -14,9 +14,6 @@ Library to test and calculate network "jitter"
 * Corrected Standard Deviation jitter calculation (Bessel's Correction)
 * RTT Range
 
-##### Future
-* TCP jitter test
-
 #### Installation
 
 Get the source with ```go get```:
@@ -28,6 +25,8 @@ $ go get github.com/cbergoon/go-jitter
 #### Example Usage
 
 ```go
+package main
+
 import (
 	"fmt"
 	"time"
@@ -36,21 +35,24 @@ import (
 )
 
 func main() {
-	j, err := jitter.NewJitterer("github.com")
+	j, err := jitter.NewJitterer("google.com")
 	if err != nil {
 		fmt.Println(err)
 	}
-	j.OnFinish = func(s *jitter.Statistics) {
-		fmt.Println(s.UncorrectedSD)
-		fmt.Println(s.CorrectedSD)
-		fmt.Println(s.RttRange)
-		fmt.Println(s.RTTS)
-	}
-	j.SetBlockSampleSize(5)
+
+	j.SetBlockSampleSize(10)
 	j.SetPingerPrivileged(true)
 	j.SetPingerTimeout(time.Second * 10)
 
 	j.Run()
+
+	s := j.Statistics()
+
+	fmt.Println("Squared Deviation: ", s.SquaredDeviation)
+	fmt.Println("Uncorrected Deviation: ", s.UncorrectedSD)
+	fmt.Println("Corrected Deviation: ", s.CorrectedSD)
+	fmt.Println("RTT Range: ", s.RttRange)
+	fmt.Println("RTTs: ", s.RTTS)
 }
 ```
 
