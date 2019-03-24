@@ -10,6 +10,7 @@ Library to test and calculate network "jitter"
 #### Features
 
 * ICMP jitter test
+* UDP jitter test
 * Uncorrected Standard Deviation jitter calculation
 * Corrected Standard Deviation jitter calculation (Bessel's Correction)
 * RTT Range
