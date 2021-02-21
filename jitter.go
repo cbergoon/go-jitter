@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	ping "github.com/sparrc/go-ping"
+	ping "github.com/go-ping/ping"
 )
 
 // Statistics represents the jitter test results with corrected and uncorrected deviations
